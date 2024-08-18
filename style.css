@@ -5,9 +5,10 @@ html, body
 
 body
 {
-    background-color: #fff8b8;
+    background-color: #FAC898;
 
-    font-family: Arial;
+    font-family: 'Courier New';
+    text-align: center;
 }
 
 button
@@ -71,8 +72,8 @@ input, textarea
 /* only want to affect text-type inputs; otherwise, it messes up sliders, radio buttons, and checkboxes */
 button, input[type="text"], textarea, select
 {
-    border-radius: 0;
-    border-width: 2px;
+    border-radius: 6px;
+    border-width: 1px;
 }
 
 td
@@ -545,12 +546,12 @@ td.selected:hover
 
 #screenshotPriceHolder
 {
-    float: left;
+    float: center;
 
     animation: fadeIn 0.2s forwards;
 }
 
 .watermark
 {
-    text-align: right;
+    text-align: center;
 }
