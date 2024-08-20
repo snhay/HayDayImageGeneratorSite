@@ -478,42 +478,27 @@ $(document).ready(() => {
       updateTotalPrice();
     saveAllToLocalStorage();
   });
+  // want to make it fire immediately the first time; I couldn't do this inside the load all function since this must be set after the load all and after the coin image url is fetched
+  priceCalculationItemInput.trigger("change");
 
+  //@snhay: allows for multiple items as price measurement
   priceCalculationItemInputList.on("change", async (event) => {
-    console.log("here");
-    let itemNameFormatted = formatItemName(event.target.value);
-    let itemList = event.target.value.split("\n");
-    let priceCalculationItemInputList = [];
-    let itemUrl, itemMaxPrice;
-    try {
-      for (let item in itemList) {
-        itemUrl = await getImageUrl(itemList[item]);
-        itemMaxPrice = await getMaxPrice(itemList[item]);
-        priceCalculationItem = new Item(
-          item,
-          undefined,
-          itemUrl,
-          undefined,
-          itemMaxPrice
-        );
-        priceCalculationItemInputList.push(priceCalculationItem);
-      }
-    } catch (e) {
-      console.log(e);
-      // default to diamond ring for invalid item names
-      itemNameFormatted = "Diamond_Ring";
+    const itemList = event.target.value.split("\n");
+    priceCalculationItemList = [];
+    let itemUrl, itemMaxPrice, itemNameFormatted;
 
-      itemUrl = await getImageUrl(itemNameFormatted);
-      itemMaxPrice = await getMaxPrice(itemNameFormatted);
+    for (let item of itemList) {
+      itemNameFormatted = formatItemName(item);
+      try {
+        itemUrl = await getImageUrl(itemNameFormatted);
+        itemMaxPrice = await getMaxPrice(itemNameFormatted);
+        priceCalculationItemList.push(
+          new Item(item, undefined, itemUrl, undefined, itemMaxPrice)
+        );
+      } catch (e) {
+        console.log(e);
+      }
     }
-    priceCalculationItemList = priceCalculationItemInputList;
-    // priceCalculationItem = new Item(
-    //   itemNameFormatted,
-    //   undefined,
-    //   itemUrl,
-    //   undefined,
-    //   itemMaxPrice
-    // );
 
     // TODO -- it might be better to just always make sure price gets immediately updated tbh (although, enabling price calc mode or showing of the price in screenshot will run update total price themselves)
     if (getIsInPriceCalculationMode() || getIsPriceShownInScreenshot())
@@ -521,8 +506,7 @@ $(document).ready(() => {
     saveAllToLocalStorage();
   });
 
-  // want to make it fire immediately the first time; I couldn't do this inside the load all function since this must be set after the load all and after the coin image url is fetched
-  priceCalculationItemInput.trigger("change");
+  priceCalculationItemInputList.trigger("change");
 
   // TODO -- should I be using change event instead of click event for checkboxes (along with any input element variants)?  Resources such as https://stackoverflow.com/questions/3442322/jquery-checkbox-event-handling make it sound like click doesn't work for certain things, but they do seem to (which is likely due to how old this so question is).  This resource seems to better explain; in my use case, they are pretty much identical, though there is a potential distinction: https://stackoverflow.com/questions/11205957/jquery-difference-between-change-and-click-event-of-checkbox
   showPriceInScreenshotCheckBox.on("click", () => {
@@ -1572,14 +1556,37 @@ function updateTotalPrice() {
     totalSelectedPriceInItems
   );
 
+  //@snhay: adding the items to the list
+  let totalSelectedPriceInItemsList = [];
+  for (let item of priceCalculationItemList) {
+    item.totalSelectedPriceInItems = +(
+      totalSelectedPrice / item.maxPrice
+    ).toFixed(2);
+
+    totalSelectedPriceInItemsList.push(item);
+  }
+
   const selectedCount = getSelectedItemCount();
   const selectedCountFormatted = getLocaleString(selectedCount);
 
-  const totalSelectedPriceHTML = `${totalSelectedPriceFormatted}<img src="${coinImageUrl}" style="width: 14px; height: 14px;"><span style="display: inline-block; width: 10px;"></span>${totalSelectedPriceInItemsFormatted}<img src="${
+  let totalSelectedPriceHTML = `${totalSelectedPriceFormatted}<img src="${coinImageUrl}" style="width: 14px; height: 14px;"><span style="display: inline-block; width: 10px;"></span>${totalSelectedPriceInItemsFormatted}<img src="${
     priceCalculationItem.url
   }" style="width: 14px; height: 14px;"><span style="display: inline-block; width: 10px;"></span>(${selectedCountFormatted} item${
     selectedCount === 1 ? "" : "s"
   })`;
+
+  //@snhay: if 2 or more items are in the list, overwrite the priceCalculationItem with the multiple items
+  if (totalSelectedPriceInItemsList.length > 1) {
+    totalSelectedPriceHTML = `${totalSelectedPriceFormatted}<img src="${coinImageUrl}" style="width: 14px; height: 14px;"><span style="display: inline-block; width: 10px;"></span>`;
+
+    for (const item of totalSelectedPriceInItemsList) {
+      totalSelectedPriceHTML += `${item.totalSelectedPriceInItems}<img src="${item.url}" style="width: 14px; height: 14px;"><span style="display: inline-block; width: 10px;"></span>`;
+    }
+
+    totalSelectedPriceHTML += `(${selectedCountFormatted} item${
+      selectedCount === 1 ? "" : "s"
+    })`;
+  }
 
   const isInPriceCalculationMode = getIsInPriceCalculationMode();
 
@@ -1596,14 +1603,11 @@ function updateTotalPrice() {
       ).toFixed(2); // the unary + converts it back to a number, removing trailing zeroes
 
       let totalPriceInItemsList = [];
-      for (let item in priceCalculationItemList) {
-        priceCalculationItemList[item].totalPriceInItems = +(
-          totalPrice / priceCalculationItemList[item].maxPrice
-        ).toFixed(2);
+      for (let item of priceCalculationItemList) {
+        item.totalPriceInItems = +(totalPrice / item.maxPrice).toFixed(2);
 
-        totalPriceInItemsList.push(priceCalculationItemList[item]);
+        totalPriceInItemsList.push(item);
       }
-      console.log(totalPriceInItemsList[1]);
       const totalPriceInItemsFormatted = getLocaleString(totalPriceInItems);
 
       const itemCount = getTotalItemCount();
@@ -1615,7 +1619,7 @@ function updateTotalPrice() {
         itemCount === 1 ? "" : "s"
       })`;
 
-      if (totalPriceInItemsList.length !== 0) {
+      if (totalPriceInItemsList.length > 1) {
         totalPriceHTML = `${totalPriceFormatted}<img src="${coinImageUrl}" style="width: 14px; height: 14px;"><span style="display: inline-block; width: 10px;"></span>`;
 
         for (const item of totalPriceInItemsList) {
@@ -1626,8 +1630,6 @@ function updateTotalPrice() {
           itemCount === 1 ? "" : "s"
         })`;
       }
-
-      //I WAS HERE
 
       screenshotPriceHolder.html(totalPriceHTML);
     } else screenshotPriceHolder.html(totalSelectedPriceHTML);
@@ -2166,6 +2168,9 @@ function loadAllFromLocalStorage() {
     localStorage.getItem("priceCalculationItem") ?? "Diamond Ring"; // default to rings
   priceCalculationItemInput.val(sPriceCalculationItem);
 
+  const sPriceCalculationItemList =
+    localStorage.getItem("priceCalculationItemList") ?? ""; // default to nothing
+  priceCalculationItemInputList.val(sPriceCalculationItemList);
   // TODO -- finish up "Selections category and add it here; might want to combine thing right below this into this"
 
   const sShowPriceInScreenshot =
@@ -2246,7 +2251,10 @@ function saveAllToLocalStorage() {
   );
   localStorage.setItem("textListFormat", textListFormatInput.val());
   localStorage.setItem("priceCalculationItem", priceCalculationItemInput.val());
-
+  localStorage.setItem(
+    "priceCalculationItemList",
+    priceCalculationItemInputList.val()
+  );
   // TODO -- finish up "Selections category and add it here; might want to combine thing right below this into this"
 
   localStorage.setItem(
